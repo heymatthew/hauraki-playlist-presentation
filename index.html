@@ -4,14 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <title>reveal.js</title>
+    <title>hauraki playlist presentation</title>
 
     <link rel="stylesheet" href="css/reset.css">
     <link rel="stylesheet" href="css/reveal.css">
-    <link rel="stylesheet" href="css/theme/black.css">
+    <link rel="stylesheet" href="css/theme/solarized.css">
 
     <!-- Theme used for syntax highlighting of code -->
-    <link rel="stylesheet" href="lib/css/monokai.css">
+    <!-- <link rel="stylesheet" href="lib/css/monokai.css"> -->
+    <link rel="stylesheet" href="lib/css/solarized-dark.css">
 
     <!-- Printing and PDF exports -->
     <script>
@@ -25,8 +26,410 @@
   <body>
     <div class="reveal">
       <div class="slides">
-        <section>Slide 1</section>
-        <section>Slide 2</section>
+        <section data-markdown>
+          Matthew B. Gray
+
+          ## A Playlist for Radio
+
+          Screen scraping Hauraki for a Spotify Playlist
+        </section>
+
+        <section data-markdown data-background="">
+          Radio Hauraki was originally broadcast offshore from the Hauraki Gulf.
+
+          It first private commercial radio station of the modern broadcasting
+          era in New Zealand and operated illegally from 1966-1970
+
+          ![](https://upload.wikimedia.org/wikipedia/commons/2/28/Coromandel.arp.375pix.jpg)
+        </section>
+
+        <section data-markdown>
+          So this might be kinda like piracy?
+
+          > Ministry sued Spotify in September 2013, claiming that the latter had
+          > refused to delete playlists based on Ministry compilations that had
+          > been created and shared by users.
+
+          source: [The Guardian](https://www.theguardian.com/technology/2014/feb/27/spotify-ministry-of-sound-lawsuit-settlement)
+        </section>
+
+        <section data-markdown>
+          Goals
+
+          1. Find some published source for playlists
+          2. Extract songs from that place
+          3. Sign into spotify programatically
+          4. Manipulate a playlist, adding tracks to it
+        </section>
+
+        <section data-markdown>
+          https://www.hauraki.co.nz/listen/just-played/
+
+          ![Hauraki's currently playing songs](hauraki-now-playing.png)
+        </section>
+
+        <section data-markdown>
+          Enter "net/http" &lt;3
+
+          ```golang
+          var haurakiURL = "https://www.hauraki.co.nz/listen/just-played"
+          func main() {
+            resp, err := http.Get(haurakiURL)
+            if err != nil {
+              panic(err) // TODO something more appropriate
+            }
+            defer resp.Body.Close()
+
+            // Checking it works
+            page, err := ioutil.ReadAll(resp.Body)
+            if err != nil {
+              panic(err) // TODO something more appropriate
+            }
+            fmt.Println(string(page))
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Nice, now we just have to get at those songs, but they're not making it easy
+
+          ```html
+          &lt;tbody&gt;
+            &lt;tr&gt;
+              &lt;td style="width: 90px;"&gt;9:28 AM&lt;/td&gt;
+              &lt;td&gt;INCUBUS&lt;/td&gt;
+              &lt;td&gt;ARE YOU IN?&lt;/td&gt;
+              &lt;td&gt;
+                &lt;a class="site-network__icon--alt iconf-iheartradio" href="http://www.iheart.com/artist/Incubus-6768/?autoplay=true" target="_blank"&gt;
+                  &lt;span class="visuallyhidden"&gt;iHeartRadio&lt;/span&gt;
+                &lt;/a&gt;
+              &lt;/td&gt;
+            &lt;/tr&gt;
+          &lt;/tbody&gt;
+          ```
+        </section>
+
+        <section data-markdown>
+          Time for some xpath love!
+          ```golang
+          import "gopkg.in/xmlpath.v2"
+
+          // XPath selectors for the second and third columns
+          var (
+            artistSelector = xmlpath.MustCompile("//table/tbody/tr/td[2]")
+            trackSelector  = xmlpath.MustCompile("//table/tbody/tr/td[3]")
+          )
+        </section>
+
+        <section data-markdown>
+          Boom! main.go:8:2: cannot find package "gopkg.in/xmlpath.v2"
+
+        </section>
+
+        <section data-markdown>
+          Lets play with Go Modules-- the new hotness
+
+          ```bash
+          go mod init gitlab.com/heymatthew/hauraki-playlist-2
+          ```
+
+          1. This creates a `go.mod`
+          2. and signals to the toolchain to use modules
+        </section>
+
+        <section data-markdown>
+          Now when we introduced new deps, our `go` tools will
+
+          1. Pull down deps
+          2. Update go.mod with deps
+          3. Create a go.sum file with hashes
+        </section>
+
+        <section data-markdown>
+          Those now live in `$GOPATH/pkg`
+
+          ```
+          $GOPATH/
+            pkg/
+            mod/
+            gopkg.in/
+            xmlpath.v2@v2.0.0-20150820204837-860cbeca3ebc/
+            ...
+          ```
+        </section>
+
+        <section data-markdown>
+          Onwards! Lets grab dem artists
+
+          ```go
+          dom, _ := xmlpath.ParseHTML(resp.Body)
+          artists := artistSelector.Iter(dom)
+          tracks := trackSelector.Iter(dom)
+
+          for {
+            if !artists.Next() || !tracks.Next() {
+              break
+            }
+            fmt.Printf("%s by %s\n", artists.Node().String(), tracks.Node().String())
+          }
+        </section>
+
+        <section data-markdown>
+          Lets tidy this up, here's a song
+
+          ```go
+          // Song is an artist and a track
+          type Song struct {
+            artist string
+            track  string
+          }
+
+          // String formats the song for printing
+          func (s Song) String() string {
+            return fmt.Sprintf("%s by %s", s.artist, s.track)
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Here's a playlist
+
+          ```go
+          // Playlist is an ordered set of songs
+          type Playlist struct {
+            songs []Song
+          }
+
+          // String formats a playlist for priting
+          func (p Playlist) String() string {
+            var buff bytes.Buffer
+            for _, song := range p.songs {
+              buff.WriteString(song.String())
+              buff.WriteString("\n")
+            }
+            return buff.String()
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          And here's how we might use them
+          ```golang
+          // NowPlaying gets a playlist of recent songs playing on Hauraki
+          func NowPlaying() Playlist {
+            resp, _ := http.Get(haurakiURL)
+            defer resp.Body.Close()
+
+            dom, _ := xmlpath.ParseHTML(resp.Body)
+            artists := artistSelector.Iter(dom)
+            tracks := trackSelector.Iter(dom)
+
+            var scraped []Song
+            for {
+              if !artists.Next() || !tracks.Next() {
+                break
+              }
+              s := Song{artists.Node().String(), tracks.Node().String()}
+              scraped = append(scraped, s)
+            }
+
+            return Playlist{scraped}
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          And we want this to happen a bit
+          ```golang
+          func everyTenSeconds(runner func()) {
+            for {
+              runner()
+              time.Sleep(10 * time.Second)
+            }
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          And we end up with something like...
+          ```golang
+          func main() {
+            everyTenSeconds(func() {
+              playlist := NowPlaying()
+              fmt.Println(playlist)
+            })
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Goals
+
+          1. DONE Find some published source for playlists
+          2. DONE Extract songs from that place
+          3. Sign into spotify programatically
+          4. Manipulate a playlist, adding tracks to it
+        </section>
+
+        <section data-markdown>
+          Spotify has a web API
+          [developer.spotify.com/documentation/web-api](https://developer.spotify.com/documentation/web-api/)
+
+          My friend Google tells points me to
+
+          [github.com/zmb3/spotify](https://github.com/zmb3/spotify)
+
+          > "This is a Go wrapper for working with Spotify's Web API"
+        </section>
+
+        <section data-markdown>
+          But we need to do this dance with login and secrets.
+
+          For simplicity, I'm using direnv
+
+          This autoloads `.envrc` as you enter a directory
+        </section>
+
+        <section data-markdown>
+          Lets get some keys!
+
+          [developer.spotify.com/dashboard/applications](https://developer.spotify.com/dashboard/applications)
+
+          ```
+          export SPOTIFY_ID=
+          export SPOTIFY_SECRET=
+          export SPOTIFY_REDIRECT=http://localhost:8080/callbackg
+          ```
+        </section>
+
+        <section>
+          So now we need to use this to get a user "signed in" to our application
+
+          To do this, we need a link to Spotify
+
+          Then we need to listen on /callback for 
+        </section>
+
+        <section data-markdown>
+          Here's what we need to setup our client
+
+          ```go
+          import (
+            "github.com/zmb3/spotify"
+            "github.com/google/uuid"
+          )
+
+          // Spotify state tracking
+          var (
+            auth = spotify.NewAuthenticator(
+              os.Getenv("SPOTIFY_REDIRECT"),
+              spotify.ScopeUserReadPrivate,
+            )
+            client spotify.Client
+            state = uuid.New().String()
+          )
+
+          func main() {
+            // ...
+            fmt.Println("Go to... ", spotifyURL())
+            auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
+            http.HandleFunc("/callback", spotifyHandler)
+            http.ListenAndServe(":8080", nil)
+          }
+
+          func spotifyURL() string {
+            return auth.AuthURL(state)
+          }
+
+          func spotifyHandler(w http.ResponseWriter, r *http.Request) {
+            token, err := auth.Token(state, r)
+            if err != nil {
+              message := fmt.Sprintf("Couldn't get token, %s", err)
+              http.Error(w, message, http.StatusNotFound)
+              return
+            }
+            client = auth.NewClient(token)
+            message := fmt.Sprintf("LGTM")
+            io.WriteString(w, message)
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Spot the bug!
+
+          Why doesn't "Go to..." print out?
+        </section>
+
+        <section data-markdown>
+          The main thread is sleeping
+
+          ```go
+          go everyTenSeconds(func() {
+            playlist := NowPlaying()
+            fmt.Println(playlist)
+          })
+          // ...
+          ```
+        </section>
+
+        <section data-markdown>
+          Lets get our users' playlists
+          ```go
+          user, _ := client.CurrentUser()
+          playlistPage, _ := client.GetPlaylistsForUser(user.ID)
+          for _, p := range playlistPage.Playlists {
+            fmt.Println(p.Name)
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Today I learnt...
+
+          ```go
+          var playlist spotify.SimplePlaylist
+          if (spotify.SimplePlaylist{}) == playlist {
+              fmt.Println("Empty playlist")
+          }
+          ```
+
+          invalid operation:
+
+          spotify.SimplePlaylist literal == playlist
+
+          (struct containing map[string]string cannot be compared)
+        </section>
+
+        <section data-markdown>
+          Instead, check some vlaue on the struct
+          ```go
+          if len(playlist.ID) > 0 {
+            return playlist
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          In context...
+
+          ```go
+          func findOrCreatePlaylist() spotify.SimplePlaylist {
+            if len(playlist.ID) > 0 {
+              return playlist
+            }
+            user, _ := client.CurrentUser()
+            playlistPage, _ := client.GetPlaylistsForUser(user.ID)
+            for _, p := range playlistPage.Playlists {
+              if p.Name == "Hauraki" {
+                playlist = p
+                return playlist
+              }
+            }
+            panic("haven't figured out how to create a playlist")
+          }
+          ```
+        </section>
       </div>
     </div>
 
