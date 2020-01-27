@@ -383,8 +383,12 @@
               playlist := NowPlaying()
               fmt.Println(playlist)
             })
+
             fmt.Println("Go to... ", spotifyURL())
-            auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
+            auth.SetAuthInfo(
+              os.Getenv("SPOTIFY_ID"),
+              os.Getenv("SPOTIFY_SECRET"),
+            )
             http.HandleFunc("/callback", spotifyHandler)
             http.ListenAndServe(":8080", nil)
           }
