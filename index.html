@@ -8,7 +8,7 @@
 
     <link rel="stylesheet" href="css/reset.css">
     <link rel="stylesheet" href="css/reveal.css">
-    <link rel="stylesheet" href="css/theme/solarized.css">
+    <link rel="stylesheet" href="css/theme/moon.css">
 
     <!-- Theme used for syntax highlighting of code -->
     <!-- <link rel="stylesheet" href="lib/css/monokai.css"> -->
@@ -34,11 +34,26 @@
           Screen scraping Hauraki for a Spotify Playlist
         </section>
 
-        <section data-markdown data-background="">
-          Radio Hauraki was originally broadcast offshore from the Hauraki Gulf.
+        <section data-markdown>
+          \#whoami
 
-          It first private commercial radio station of the modern broadcasting
-          era in New Zealand and operated illegally from 1966-1970
+          Matthew B. Gray
+
+          - Rubiest by day
+          - Gopher by night
+          - CoNZealand maintainer
+          - [gitlab.com/heymatthew](https://gitlab.com/heymatthew)
+        </section>
+
+        <section data-markdown>
+          Radio Hauraki breif history
+
+          * It first private commercial radio station in NZ
+          * operated illegally from 1966-1970
+        </section>
+
+        <section data-markdown>
+          They originally broadcast offshore from the Hauraki Gulf
 
           ![](https://upload.wikimedia.org/wikipedia/commons/2/28/Coromandel.arp.375pix.jpg)
         </section>
@@ -91,10 +106,11 @@
         </section>
 
         <section data-markdown>
-          Nice, now we just have to get at those songs, but they're not making it easy
+          Nice, now we just have to get at those songs
 
           ```html
           &lt;tbody&gt;
+            ...
             &lt;tr&gt;
               &lt;td style="width: 90px;"&gt;9:28 AM&lt;/td&gt;
               &lt;td&gt;INCUBUS&lt;/td&gt;
@@ -105,6 +121,7 @@
                 &lt;/a&gt;
               &lt;/td&gt;
             &lt;/tr&gt;
+            ...
           &lt;/tbody&gt;
           ```
         </section>
@@ -122,12 +139,19 @@
         </section>
 
         <section data-markdown>
-          Boom! main.go:8:2: cannot find package "gopkg.in/xmlpath.v2"
+          Boom!
+
+          ```
+          main.go:8:2:
+            cannot find package "gopkg.in/xmlpath.v2"
+          ```
 
         </section>
 
         <section data-markdown>
-          Lets play with Go Modules-- the new hotness
+          Lets play with Go Modules
+
+          The **new** hotness
 
           ```bash
           go mod init gitlab.com/heymatthew/hauraki-playlist-2
@@ -311,7 +335,7 @@
         </section>
 
         <section data-markdown>
-          Here's what we need to setup our client
+          Here's the basics of what we need
 
           ```go
           import (
@@ -328,7 +352,12 @@
             client spotify.Client
             state = uuid.New().String()
           )
+          ```
+        </section>
 
+        <section data-markdown>
+          And here's how we might use it
+          ```go
           func spotifyURL() string {
             return auth.AuthURL(state)
           }
@@ -426,7 +455,7 @@
         </section>
 
         <section data-markdown>
-          Instead, check some vlaue on the struct
+          Instead, check some value on the struct
           ```go
           if len(playlist.ID) > 0 {
             return playlist
@@ -458,11 +487,18 @@
         <section data-markdown>
           Lets try add a track to our playlist!
           ```go
-          search, _ := client.Search(nowPlaying.CurrentSong().String(), spotify.SearchTypeTrack)
+          search, _ := client.Search(
+            nowPlaying.CurrentSong().String(),
+            spotify.SearchTypeTrack
+          )
           fmt.Println(search.Tracks.Tracks[0])
 
           spotifyPlaylist := findOrCreatePlaylist()
-          _, err := client.AddTracksToPlaylist(spotifyPlaylist.ID, search.Tracks.Tracks[0].ID)
+          _, err := client.AddTracksToPlaylist(
+            spotifyPlaylist.ID,
+            search.Tracks.Tracks[0].ID
+          )
+
           if err != nil {
             fmt.Println(err)
           }
@@ -470,7 +506,9 @@
         </section>
 
         <section data-markdown>
-          Oh no!
+          Computer says no!
+
+          Scopes were wrong
 
           > ...scopes provide Spotify users using third-party apps the confidence
           > that only the information they choose to share will be shared, and
@@ -539,8 +577,16 @@
           What have I learnt?
 
           * Glue code can be really cool
-          * Documentation is hard for details, but great for big picture
           * Go modules are simpler than I thought they'd be
+          * Empty struct comparison is weird
+        </section>
+
+        <section data-markdown>
+          What could you do from here?
+
+          * Offline songs for our trip south
+          * Spotify play controls clapper
+          * Statistical analysis of song picks
         </section>
 
         <section data-markdown>
@@ -549,8 +595,6 @@
 
         <section data-markdown>
           Questions?
-
-          What could I have done better?
         </section>
       </div>
     </div>
