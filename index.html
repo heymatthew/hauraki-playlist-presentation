@@ -186,7 +186,7 @@
 
           // String formats the song for printing
           func (s Song) String() string {
-            return fmt.Sprintf("%s by %s", s.artist, s.track)
+            return fmt.Sprintf("%s by %s", s.track, s.artist)
           }
           ```
         </section>
@@ -302,8 +302,8 @@
           ```
         </section>
 
-        <section>
-          So now we need to use this to get a user "signed in" to our application
+        <section data-markdown>
+          So now we need to use this to get a user "signed in"
 
           To do this, we need a link to Spotify
 
@@ -329,14 +329,6 @@
             state = uuid.New().String()
           )
 
-          func main() {
-            // ...
-            fmt.Println("Go to... ", spotifyURL())
-            auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
-            http.HandleFunc("/callback", spotifyHandler)
-            http.ListenAndServe(":8080", nil)
-          }
-
           func spotifyURL() string {
             return auth.AuthURL(state)
           }
@@ -356,6 +348,19 @@
         </section>
 
         <section data-markdown>
+          ```go
+          func main() {
+            everyTenSeconds(func() {
+              playlist := NowPlaying()
+              fmt.Println(playlist)
+            })
+            fmt.Println("Go to... ", spotifyURL())
+            auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
+            http.HandleFunc("/callback", spotifyHandler)
+            http.ListenAndServe(":8080", nil)
+          }
+          ```
+
           Spot the bug!
 
           Why doesn't "Go to..." print out?
@@ -370,6 +375,25 @@
             fmt.Println(playlist)
           })
           // ...
+          ```
+        </section>
+
+        <section data-markdown>
+          Sweet, let's find what's on the radio!
+          ```go
+          // CurrentSong returns the song currently on the radio
+          func (p Playlist) CurrentSong() Song {
+            return p.songs[0]
+          }
+
+          func main() {
+            // ...
+            search, _ := client.Search(
+              nowPlaying.CurrentSong().String(),
+              spotify.SearchTypeTrack,
+            )
+            fmt.Println(search.Tracks.Tracks)
+          }
           ```
         </section>
 
@@ -426,9 +450,107 @@
                 return playlist
               }
             }
-            panic("haven't figured out how to create a playlist")
+            panic("TODO spotify.CreatePlaylistForUser")
           }
           ```
+        </section>
+
+        <section data-markdown>
+          Lets try add a track to our playlist!
+          ```go
+          search, _ := client.Search(nowPlaying.CurrentSong().String(), spotify.SearchTypeTrack)
+          fmt.Println(search.Tracks.Tracks[0])
+
+          spotifyPlaylist := findOrCreatePlaylist()
+          _, err := client.AddTracksToPlaylist(spotifyPlaylist.ID, search.Tracks.Tracks[0].ID)
+          if err != nil {
+            fmt.Println(err)
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Oh no!
+
+          > ...scopes provide Spotify users using third-party apps the confidence
+          > that only the information they choose to share will be shared, and
+          > nothing more.
+
+          [developer.spotify.com/documentation/general/guides/scopes](
+            https://developer.spotify.com/documentation/general/guides/scopes/
+          )
+        </section>
+
+        <section data-markdown>
+          Look what I found...
+
+          ![playlist-modify-private scope provides Write access to a user's private playlists](
+            interesting-spotify-scopes.png
+          )
+        </section>
+
+        <section data-markdown>
+          ```go
+          func NewAuthenticator(
+            redirectURL string,
+            scopes ...string) Authenticator
+          ```
+
+          Lets give it a try!
+          ```go
+          auth = spotify.NewAuthenticator(
+            os.Getenv("SPOTIFY_REDIRECT"),
+            spotify.ScopePlaylistReadPrivate,
+            spotify.ScopePlaylistModifyPublic,
+            spotify.ScopePlaylistModifyPrivate,
+            spotify.ScopePlaylistReadCollaborative,
+          )
+          ```
+        </section>
+
+        <section data-markdown>
+          Right, lets only add new tracks as we go
+
+          ```go
+          var justAdded spotify.ID
+
+          func main() {
+            // ...
+            spotifyTrack := search.Tracks.Tracks[0].ID
+            if justAdded == spotifyTrack {
+              return
+            }
+            justAdded = spotifyTrack
+            // ...
+          }
+          ```
+        </section>
+
+        <section data-markdown>
+          Things I should have done here
+
+          * Start again, but now with some higher level tests
+          * Handle all those error cases as we go
+          * Break out a few more files
+          * Move more behaviour to the structs
+        </section>
+
+        <section data-markdown>
+          What have I learnt?
+
+          * Glue code can be really cool
+          * Documentation is hard for details, but great for big picture
+          * Go modules are simpler than I thought they'd be
+        </section>
+
+        <section data-markdown>
+          Shameless self promotion time
+        </section>
+
+        <section data-markdown>
+          Questions?
+
+          What could I have done better?
         </section>
       </div>
     </div>
