@@ -414,15 +414,17 @@
         <section data-markdown>
           Sweet, let's find what's on the radio!
           ```go
-          // CurrentSong returns the song currently on the radio
           func (p Playlist) CurrentSong() Song {
             return p.songs[0]
           }
 
           func main() {
             // ...
+            if (spotify.Client{}) == client {
+              return
+            }
             search, _ := client.Search(
-              nowPlaying.CurrentSong().String(),
+              playlist.CurrentSong().String(),
               spotify.SearchTypeTrack,
             )
             fmt.Println(search.Tracks.Tracks)
@@ -447,7 +449,7 @@
           ```go
           var playlist spotify.SimplePlaylist
           if (spotify.SimplePlaylist{}) == playlist {
-              fmt.Println("Empty playlist")
+              fmt.Println("Handle me!")
           }
           ```
 
@@ -462,7 +464,7 @@
           Instead, check some value on the struct
           ```go
           if len(playlist.ID) > 0 {
-            return playlist
+              fmt.Println("Handle me!")
           }
           ```
         </section>
@@ -471,6 +473,7 @@
           In context...
 
           ```go
+          var playlist spotify.SimplePlaylist
           func findOrCreatePlaylist() spotify.SimplePlaylist {
             if len(playlist.ID) > 0 {
               return playlist
@@ -492,15 +495,15 @@
           Lets try add a track to our playlist!
           ```go
           search, _ := client.Search(
-            nowPlaying.CurrentSong().String(),
-            spotify.SearchTypeTrack
+            playlist.CurrentSong().String(),
+            spotify.SearchTypeTrack,
           )
           fmt.Println(search.Tracks.Tracks[0])
 
           spotifyPlaylist := findOrCreatePlaylist()
           _, err := client.AddTracksToPlaylist(
             spotifyPlaylist.ID,
-            search.Tracks.Tracks[0].ID
+            search.Tracks.Tracks[0].ID,
           )
 
           if err != nil {
@@ -588,9 +591,9 @@
         <section data-markdown>
           What could you do from here?
 
+          * Clapper with spotify play controls
+          * Statistical analysis of song picks by DJ
           * Offline songs for our trip south
-          * Spotify play controls clapper
-          * Statistical analysis of song picks
         </section>
 
         <section data-markdown>
